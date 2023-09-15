@@ -16,6 +16,7 @@ def get_attributes(x: nn.Module, attributes: str):
     """
     for attr in attributes.split("."):
         x = getattr(x, attr)
+        a = 1
     return x
 
 

@@ -41,6 +41,12 @@ class KnowledgeNeurons:
             self.output_ff_attr = "output.dense.weight"
             self.word_embeddings_attr = "bert.embeddings.word_embeddings.weight"
             self.unk_token = getattr(self.tokenizer, "unk_token_id", None)
+        elif self.model_type == "roberta":
+            self.transformer_layers_attr = "roberta.encoder.layer"
+            self.input_ff_attr = "intermediate"
+            self.output_ff_attr = "output.dense.weight"
+            self.word_embeddings_attr = "roberta.embeddings.word_embeddings.weight"
+            self.unk_token = getattr(self.tokenizer, "unk_token_id", None)
         elif "gpt" in model_type:
             self.transformer_layers_attr = "transformer.h"
             self.input_ff_attr = "mlp.c_fc"
@@ -75,6 +81,10 @@ class KnowledgeNeurons:
         if encoded_input is None:
             encoded_input = self.tokenizer(prompt, return_tensors="pt").to(self.device)
         if self.model_type == "bert":
+            mask_idx = torch.where(
+                encoded_input["input_ids"][0] == self.tokenizer.mask_token_id
+            )[0].item()
+        elif self.model_type == "roberta":
             mask_idx = torch.where(
                 encoded_input["input_ids"][0] == self.tokenizer.mask_token_id
             )[0].item()
@@ -140,6 +150,8 @@ class KnowledgeNeurons:
 
     def intermediate_size(self):
         if self.model_type == "bert":
+            return self.model.config.intermediate_size
+        elif self.model_type == "roberta":
             return self.model.config.intermediate_size
         else:
             return self.model.config.hidden_size * 4
@@ -722,8 +734,8 @@ class KnowledgeNeurons:
         word_embeddings_weights = self._get_word_embeddings()
         if mode == "edit":
             assert (
-                self.model_type == "bert"
-            ), "edit mode currently only working for bert models - TODO"
+                self.model_type == "bert" or self.model_type =="roberta"
+            ), "edit mode currently only working for bert style models - TODO"
             original_prediction_id = argmax_tokens[0]
             original_prediction_embedding = word_embeddings_weights[
                 original_prediction_id
@@ -733,7 +745,7 @@ class KnowledgeNeurons:
         if erase_value == "zero":
             erase_value = 0
         else:
-            assert self.model_type == "bert", "GPT models don't have an unk token"
+            assert (self.model_type == "bert" or self.model_type == "roberta"), "GPT models don't have an unk token"
             erase_value = word_embeddings_weights[self.unk_token]
 
         # modify the weights by subtracting the original prediction's word embedding
